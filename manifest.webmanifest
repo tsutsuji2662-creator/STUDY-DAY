@@ -1,0 +1,9 @@
+{
+  "name": "StudyDay",
+  "short_name": "StudyDay",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f8f7f8",
+  "theme_color": "#ff5d78",
+  "lang": "ja"
+}

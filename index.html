@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#ff5d78">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="StudyDay">
+<link rel="manifest" href="manifest.webmanifest">
+<title>StudyDay</title>
+<style>
+:root{--pink:#ff5d78;--pink2:#ff8da0;--soft:#fff1f4;--ink:#202124;--muted:#777;--line:#eee7ea;--bg:#f8f7f8;--green:#38b987}
+*{box-sizing:border-box}body{margin:0;background:#e9e9ee;color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Noto Sans JP",sans-serif}
+.app{max-width:430px;min-height:100vh;margin:auto;background:var(--bg);padding:calc(14px + env(safe-area-inset-top)) 15px calc(86px + env(safe-area-inset-bottom))}
+h1{font-size:23px;margin:0 0 13px}.muted{color:var(--muted);font-size:13px}.card{background:#fff;border-radius:19px;padding:16px;margin:10px 0;box-shadow:0 3px 12px #00000009}
+.hero{background:linear-gradient(135deg,#fff0f3,#ffe1e7);border:1px solid #ffd4dc}.hero .days{color:#df3857}.days{font-size:39px;font-weight:850;margin:4px 0}.smallrow{display:flex;justify-content:space-between;align-items:center}.big{font-size:29px;font-weight:850}.bar{height:9px;background:#eeeef1;border-radius:99px;overflow:hidden;margin:10px 0}.bar i{display:block;height:100%;background:var(--pink);border-radius:99px}.tomatoes{display:flex;gap:3px;flex-wrap:wrap;margin:9px 0}.apple{font-size:21px}.off{opacity:.18;filter:grayscale(1)}.grid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.mini{background:#fcfbfc;border:1px solid var(--line);border-radius:14px;padding:12px}.mini b{font-size:20px;display:block;margin-top:3px}
+button,select,input{font:inherit}button{border:0;border-radius:13px;padding:12px 14px;font-weight:750}.primary{background:var(--pink);color:#fff}.light{background:#f2f1f4;color:#333}.full{width:100%}.row{display:flex;gap:9px}.row>*{flex:1}select,input{width:100%;padding:11px;border:1px solid var(--line);border-radius:11px;background:#fff}
+.center{text-align:center}.timer{font-size:62px;font-weight:850;margin:10px 0}.ring{border:9px solid #ffd6de;border-right-color:var(--pink);border-radius:50%;width:220px;height:220px;margin:16px auto;display:flex;flex-direction:column;align-items:center;justify-content:center}.ring .timer{margin:0}.list>div{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--line)}.list>div:last-child{border:0}
+.calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}.dow{text-align:center;color:#888;font-size:11px}.day{aspect-ratio:1;border-radius:8px;background:#ececf0;display:flex;align-items:center;justify-content:center;font-size:11px}.d1{background:#ffdfe6}.d2{background:#ffb7c5}.d3{background:#ff879b;color:#fff}.d4{background:#ff5d78;color:#fff}.today{outline:2px solid #222}
+.badges{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.badge{border:1px solid var(--line);border-radius:14px;text-align:center;padding:11px}.badge span{font-size:25px;display:block}.locked{opacity:.28}
+.nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:430px;height:70px;background:#fff;border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(4,1fr);z-index:5}.nav button{background:transparent;color:#888;border-radius:0;padding:6px 0;font-size:11px}.nav button.active{color:var(--pink)}.nav b{display:block;font-size:20px;margin-bottom:2px}
+.toast{position:fixed;bottom:82px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:10px 15px;border-radius:99px;font-size:13px;display:none;z-index:20;white-space:nowrap}
+.sheet{position:fixed;inset:0;background:#0005;display:none;align-items:flex-end;z-index:10}.sheet>div{background:#fff;width:100%;max-width:430px;margin:auto;border-radius:22px 22px 0 0;padding:20px}.sheet h2{margin-top:0}
+</style>
+</head>
+<body>
+<div class="app"><h1>🍎 StudyDay</h1><div id="screen"></div></div>
+<div class="nav">
+<button data-tab="home" class="active"><b>⌂</b>ホーム</button>
+<button data-tab="record"><b>🍎</b>記録</button>
+<button data-tab="calendar"><b>□</b>カレンダー</button>
+<button data-tab="stats"><b>⏱</b>達成</button>
+</div>
+<div id="toast" class="toast"></div>
+<div id="finish" class="sheet"><div><h2>勉強を終了しますか？</h2><p class="muted">途中でも、実際に勉強した時間をそのまま記録できます。</p><div class="row"><button class="light" onclick="closeFinish()">キャンセル</button><button class="primary" onclick="finish()">記録する</button></div></div></div>
+<script>
+const KEY="studyday-v1";
+let s=JSON.parse(localStorage.getItem(KEY)||"null")||{
+ tab:"home",goal:300,weekGoal:2100,totalGoal:60000,today:0,week:0,total:0,streak:0,rewards:0,
+ subject:"憲法",subjects:{憲法:0,民法:0,行政法:0,"数的処理":0,判断推理:0,文章理解:0},
+ sessions:[],timer:1500,running:false,paused:false,mode:25,startedAt:0,dayKey:""
+};
+function save(){localStorage.setItem(KEY,JSON.stringify(s))}
+function fmt(m){m=Math.max(0,Math.round(m));return Math.floor(m/60)+"時間"+String(m%60).padStart(2,"0")+"分"}
+function short(m){m=Math.max(0,Math.round(m));return Math.floor(m/60)+"h "+String(m%60).padStart(2,"0")+"m"}
+function days(){return Math.max(0,Math.ceil((new Date("2027-05-02T00:00:00")-new Date())/86400000))}
+function toast(t){let e=document.getElementById("toast");e.textContent=t;e.style.display="block";clearTimeout(window.tt);window.tt=setTimeout(()=>e.style.display="none",1800)}
+function ensureDay(){let k=new Date().toISOString().slice(0,10);if(s.dayKey!==k){s.dayKey=k;s.today=0;s.streak=s.streak||0;save()}}
+ensureDay();
+function setTab(t){s.tab=t;save();document.querySelectorAll(".nav button").forEach(b=>b.classList.toggle("active",b.dataset.tab===t));render()}
+document.querySelectorAll(".nav button").forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
+function render(){ensureDay();let e=document.getElementById("screen");e.innerHTML=s.tab==="home"?home():s.tab==="record"?record():s.tab==="calendar"?calendar():stats();bind()}
+function home(){
+let pct=Math.min(100,s.today/s.goal*100), left=Math.max(0,s.goal-s.today), totalSets=Math.ceil(s.goal/s.mode), done=Math.min(totalSets,Math.floor(s.today/s.mode)), remainSets=Math.max(0,totalSets-done);
+let apples=Array.from({length:totalSets},(_,i)=>`<span class="apple ${i<done?"":"off"}">🍎</span>`).join("");
+return `<div class="card hero"><div class="muted">国家一般職（大卒程度）</div><div class="days">あと ${days()}日</div><div class="muted">第1次試験：2027年5月2日</div></div>
+<div class="card"><div class="smallrow"><div><div class="muted">今日の勉強</div><div class="big">${short(s.today)}</div></div><span class="muted">目標 ${short(s.goal)}</span></div><div class="bar"><i style="width:${pct}%"></i></div><b>あと ${fmt(left)}</b><div class="tomatoes">${apples}</div><div class="muted">🍎 あと ${remainSets}セット</div></div>
+<div class="card"><div class="grid"><div class="mini"><span class="muted">今週</span><b>${short(s.week)}</b><span class="muted">/ ${short(s.weekGoal)}</span></div><div class="mini"><span class="muted">連続勉強日数</span><b>🔥 ${s.streak}日</b></div></div></div>
+<div class="card"><b>🎯 今日のチャレンジ</b><p class="muted">${remainSets?`あと${remainSets}セットで今日の目標！`:"🏆 今日の目標達成！"}</p><button class="primary full" onclick="setTab('record')">🍎 勉強を始める</button></div>
+<div class="card"><div class="smallrow"><b>累計勉強時間</b><b>${short(s.total)}</b></div><div class="bar"><i style="width:${Math.min(100,s.total/s.totalGoal*100)}%"></i></div></div>`;
+}
+function record(){
+let sec=Math.max(0,s.timer),clock=String(Math.floor(sec/60)).padStart(2,"0")+":"+String(sec%60).padStart(2,"0");
+return `<div class="card center"><div class="muted">${s.subject} · ${s.running?(s.paused?"一時停止":"勉強中"):"スタンバイ"}</div><div class="ring"><div class="timer">${clock}</div><div class="muted">${s.running?"集中中":"25分 / 5分"}</div></div>${s.running?`<div class="row"><button class="light" onclick="pause()">${s.paused?"▶ 再開":"⏸ 一時停止"}</button><button class="light" onclick="askFinish()">終了</button></div>`:`<button class="primary full" onclick="start()">▶ START</button>`}</div>
+<div class="card"><b>科目</b><div style="height:8px"></div><select id="subject">${Object.keys(s.subjects).map(x=>`<option ${x===s.subject?"selected":""}>${x}</option>`).join("")}</select><div style="height:9px"></div><div class="row"><button class="light" onclick="setMode(25)">25分 / 5分</button><button class="light" onclick="setMode(50)">50分 / 10分</button></div></div>
+<div class="card"><b>✍️ 手入力</b><div style="height:8px"></div><div class="row"><input id="manual" type="number" min="1" placeholder="分"><button class="primary" onclick="manual()">記録</button></div></div>
+<div class="card"><b>今日の記録</b><div class="list">${s.sessions.slice(-6).reverse().map(x=>`<div><span>${x.subject}</span><b>${x.minutes}分</b></div>`).join("")||'<div class="muted">まだ記録はありません</div>'}</div></div>`;
+}
+function calendar(){
+let a={};s.sessions.forEach(x=>{a[x.date]=(a[x.date]||0)+x.minutes});let now=new Date(),y=now.getFullYear(),mo=now.getMonth(),first=new Date(y,mo,1).getDay(),last=new Date(y,mo+1,0).getDate(),out=["日","月","火","水","木","金","土"].map(x=>`<div class="dow">${x}</div>`).join("");
+for(let i=0;i<first;i++)out+="<div></div>";
+for(let d=1;d<=last;d++){let key=`${y}-${String(mo+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`,m=a[key]||0,c=m>=300?"d4":m>=180?"d3":m>=60?"d2":m>0?"d1":"";out+=`<div class="day ${c} ${d===now.getDate()?"today":""}" title="${m}分">${d}</div>`}
+return `<div class="card"><div class="smallrow"><b>カレンダー</b><span class="muted">${y}年${mo+1}月</span></div><div style="height:10px"></div><div class="calendar">${out}</div><p class="muted">⬜ 0時間　🩷 1〜3時間　🌸 3〜5時間　❤️ 5時間以上</p></div>
+<div class="card"><b>今週の勉強時間</b><div class="big">${short(s.week)}</div><div class="bar"><i style="width:${Math.min(100,s.week/s.weekGoal*100)}%"></i></div><span class="muted">目標 ${short(s.weekGoal)}</span></div>`;
+}
+function stats(){
+let rem=Math.max(0,s.totalGoal-s.total),badges=[
+["🌱","10時間",s.total>=600],["🍎","25時間",s.total>=1500],["🔥","50時間",s.total>=3000],["💯","100時間",s.total>=6000],["🚀","250時間",s.total>=15000],["🏆","500時間",s.total>=30000],["👑","1,000時間",s.total>=60000]
+];
+return `<div class="card"><div class="muted">累計勉強時間</div><div class="days" style="color:#df3857">${fmt(s.total)}</div><div class="muted">目標 ${fmt(s.totalGoal)} · 残り ${fmt(rem)}</div><div class="bar"><i style="width:${Math.min(100,s.total/s.totalGoal*100)}%"></i></div></div>
+<div class="card"><b>🔥 連続勉強日数</b><div class="big" style="margin-top:6px">${s.streak}日</div></div>
+<div class="card"><b>📚 科目別の累計時間</b><div class="list">${Object.entries(s.subjects).map(([k,v])=>`<div><span>${k}</span><b>${short(v)}</b></div>`).join("")}</div></div>
+<div class="card"><b>🏅 達成バッジ</b><p class="muted">時間の積み上げを記録。</p><div class="badges">${badges.map(x=>`<div class="badge ${x[2]?"":"locked"}"><span>${x[0]}</span><b>${x[1]}</b></div>`).join("")}</div></div>
+<div class="card"><b>🎁 ごほうびチケット：${s.rewards}枚</b><p class="muted">目標達成でチケットを獲得。好きなごほうびに交換できます。</p><button class="light" onclick="useReward()">1枚使う</button></div>`;
+}
+function bind(){let e=document.getElementById("subject");if(e)e.onchange=()=>{s.subject=e.value;save()}}
+let interval=null;
+function start(){if(s.running)return;s.running=true;s.paused=false;s.startedAt=Date.now();if(!s.timer)s.timer=s.mode*60;save();render();interval=setInterval(tick,1000);toast("🍎 スタート！")}
+function tick(){if(!s.running||s.paused)return;s.timer--;let e=document.querySelector(".timer");if(e)e.textContent=String(Math.floor(s.timer/60)).padStart(2,"0")+":"+String(s.timer%60).padStart(2,"0");if(s.timer<=0)complete()}
+function addStudy(m,type){if(m<=0)return;s.today+=m;s.week+=m;s.total+=m;s.subjects[s.subject]+=m;let date=new Date().toISOString().slice(0,10);s.sessions.push({date,subject:s.subject,minutes:m,type});if(m>=s.mode)s.rewards+=Math.floor(m/300);save()}
+function complete(){clearInterval(interval);interval=null;addStudy(s.mode,"ポモドーロ");s.timer=s.mode*60;s.running=false;s.paused=false;save();render();toast("🎉 1セット達成！")}
+function pause(){s.paused=!s.paused;save();render();toast(s.paused?"⏸ 一時停止":"▶ 再開！")}
+function askFinish(){document.getElementById("finish").style.display="flex"}
+function closeFinish(){document.getElementById("finish").style.display="none"}
+function finish(){let used=Math.max(0,s.mode-Math.ceil(s.timer/60));clearInterval(interval);interval=null;if(used)addStudy(used,"途中終了");s.timer=s.mode*60;s.running=false;s.paused=false;closeFinish();render();toast(used?`✓ ${used}分記録`:"記録なし")}
+function setMode(n){if(!s.running){s.mode=n;s.timer=n*60;save();render()}}
+function manual(){let v=Number(document.getElementById("manual").value);if(v>0){addStudy(v,"手入力");render();toast(`✓ ${v}分記録`)}}
+function useReward(){if(s.rewards>0){s.rewards--;save();render();toast("🎁 ごほうびチケットを使った！")}else toast("まだチケットがありません")}
+render();
+</script>
+</body>
+</html>
